@@ -12,7 +12,7 @@ const physics = Physics.create();
 // Render canvas to the DOM
 const render = Render.create({
   element: document.body,
-  physics,
+  physics: physics,
   engine: Engine,
   options: {
     height: 800,
@@ -31,6 +31,6 @@ Sandbox.add(world, [
 
 Render.draw(render);
 
-Looper.run(render, Render.draw, physics, { enable: false });
+Looper.run(render, Render.draw, physics, { enable: true });
 
 Engine.update()
