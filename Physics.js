@@ -1,5 +1,0 @@
-let Physics = {
-	initialize: function () {
-
-	}
-}

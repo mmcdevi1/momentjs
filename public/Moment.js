@@ -1,99 +1,111 @@
-class Vector {
-  constructor (x, y) {
-    this.x = x
-    this.y = y
+let Moment = {};
+
+Moment.Engine = class {
+  constructor () {
+    this.defaults = {
+
+    }
+
+    this.world = {
+      bodies: []
+    }
   }
 
-  add (velocity) {
-    this.x += velocity.x
-    this.y += velocity.y
-  }
-
-  sub (velocity) {
-    this.x -= velocity.x
-    this.y -= velocity.y
+  update () {
+    console.log('update')
   }
 }
 
-const Physics = {
-  create: function () {
+Moment.Physics = class {
+  create () {
     var defaults = {
-      gravity: 9.81
+      gravity: new Vector(0, 0.05)
     }
 
     return defaults;
   }
 }
 
-// if (location.y > canvas.height || location.y < 0) {
-//   velocity.y = -velocity.y
-// }
-
-const RigidBody = {
-  circle: function (options) {
-    const { x, y, radius } = options;
-    const location = new Vector(x, y); 
-
-    return function (render) {
-      render.ctx.clearRect(0, 0, render.canvas.width, render.canvas.height);
-      render.ctx.beginPath()
-      render.ctx.arc(location.x, location.y, radius, 0, Math.PI * 2, false)
-      render.ctx.fillStyle = 'red';
-      render.ctx.fill()
-      render.ctx.closePath()
-
-      location.y += 2
-    }
-  },
-}
-
-const Sandbox = {
-  add: function (render, bodies) {
-    bodies(render)
-  },
-
-  object: function () {
-    let objects = []
-
-    
-
-    return objects
-  }
-}
-
-const Render = {
-  create: function (obj) {
+Moment.Render = class {
+  create (obj) {
     const defaults = {
-      element: document.body,
+      element: null,
       physics: null,
+      engine: null,
       options: {
         height: 800,
         width: 800,
+        background: '#333',
       }
     }
 
-    let height = 800;
-    let width  = 800;
-
-    if (obj) {
-      height = obj.options.height;
-      width  = obj.options.width;
+    const render = {
+      ...defaults,
+      ...obj,
+      options: {
+        ...defaults.options,
+        ...obj.options
+      }
     }
 
-    let render = {
-      ...defaults
-    }
-
-    render.element = render.element || obj.element;
-    render.physics = render.physics || obj.physics
-    render.canvas = this._createCanvas(height, width)
+    render.canvas = this._createCanvas(render.options.height, render.options.width)
     render.ctx = render.canvas.getContext('2d')
+
+    // Render canvas element to the DOM
     render.element.insertAdjacentElement('afterbegin', render.canvas)
 
     return render;
-  },
+  }
 
-  _createCanvas: function (height, width) {
+  draw (render) {
+    const { 
+      canvas, 
+      ctx, 
+      physics: { gravity },
+      engine: { world: { bodies } },
+      options: { width, height, background } 
+    } = render;
+
+    // Fill background of canvas
+    ctx.fillStyle = background;
+    ctx.fillRect(0, 0, width, height);
+
+    // Render all bodies to the Canvas
+    for (let body of bodies) {
+      const { 
+        shape, 
+        fillStyle, 
+        radius, 
+        velocity,
+        position, 
+        position: { x, y } 
+      } = body;
+
+      ctx.beginPath()
+
+      switch (shape) {
+        case 'circle':
+          ctx.arc(x, y, radius, 0, Math.PI * 2, false)
+          ctx.fillStyle = fillStyle;
+          ctx.fill()
+          position.add(velocity)
+          velocity.add(gravity)
+          break;
+        case 'rect':
+          ctx.rect(x, y, body.width, body.height)
+          ctx.fillStyle = fillStyle;
+          ctx.fill()
+          break;
+        default:
+          break;
+      }
+
+      ctx.closePath()
+      
+    }
+  }
+
+  _createCanvas (height, width) {
     let canvas = document.createElement('canvas');
     canvas.height = height;
     canvas.width = width;
@@ -102,44 +114,94 @@ const Render = {
   }
 }
 
-const Looper = {
-  run: function (render) {
-    // const { ctx, canvas } = render;
+Moment.Sandbox = class {
+  constructor () {
 
-    // setInterval(function () {
-    //   ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // }, 10)
+  }
 
+  add (world, rigidBodies) {
+    if (Array.isArray(rigidBodies)) {
+
+      for (let body of rigidBodies) {
+        console.log(body)
+        world.bodies.push(body)
+      }
+
+    } else {
+      world.bodies.push(rigidBodies)
+    }
+  }
+}
+
+Moment.RigidBody = class {
+  circle (x, y, radius, options) {
+    const defaults = {
+      shape: 'circle',
+      fillStyle: 'red',
+      area: Math.round(Math.PI * radius ** 2),
+      radius: radius,
+      position: new Vector(x, y),
+      velocity: new Vector(0, 0),
+      acceleration: new Vector(0, 0),
+    }
+
+    const extend = {
+      ...defaults,
+      ...options,
+    }
+
+    return extend
+  }
+
+  rect (x, y, width, height, options) {
+    const defaults = {
+      shape: 'rect',
+      fillStyle: 'red',
+      area: width * height,
+      isStatic: false,
+      width,
+      height,
+      position: new Vector(x, y),
+      velocity: new Vector(0, 0),
+      acceleration: new Vector(0, 0),
+    }
+
+    const extend = {
+      ...defaults,
+      ...options,
+    }
+
+    return extend
+  }
+
+  applyForce (force) {
+
+  }
+}
+
+Moment.Looper = class {
+  run (render, draw, engine, options) {
+    const { 
+      canvas, 
+      ctx, 
+      engine: { world: { bodies } },
+      options: { width, height, background } 
+    } = render;
+
+    if (options.enable) {
+
+      setInterval(function () {
+        ctx.fillStyle = background;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        draw(render)
+      }, 10)
+
+    }
     // requestAnimationFrame(this.run.bind(this))
-    Moment.Sandbox.add()
   }
 }
 
-
-const Moment = {
-  Physics,
-  RigidBody,
-  Looper,
-  Render,
-  Sandbox,
-}
-
-const physics = Moment.Physics.create();
-
-const render = Moment.Render.create({
-  element: document.body,
-  physics: physics,
-  options: {
-    height: 600,
-    width: 600
-  }
-})
-
-Moment.Looper.run(render)
-
-Moment.Sandbox.add(render,
-  Moment.RigidBody.circle({ x: 200,  y: 50,  radius: 10 })
-)
 
 
 
