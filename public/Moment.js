@@ -2,24 +2,76 @@ let Moment = {};
 
 Moment.Engine = class {
   constructor () {
-    this.defaults = {
-
-    }
-
     this.world = {
-      bodies: []
+      bodies: [],
+      bounds: {},
     }
   }
 
-  update () {
-    console.log('update')
+  set (prop) {
+    const copy = {
+      ...this.world,
+      [prop.label]: prop
+    }
+
+    this.world = copy
+  }
+
+  update (engine, render) {
+    const { 
+      bodies, 
+      physics: { gravity } 
+    } = engine.world;
+
+    const ground = bodies.find(body => {
+      return body.isStatic
+    })
+
+    for (let body of bodies) {
+      let { 
+        shape, 
+        fillStyle, 
+        radius, 
+        vector: { velocity, position, acceleration },
+      } = body;
+
+      if (!body.isStatic) {
+        
+        
+
+        if ((position.y) > (ground.vector.position.y - radius) || (position.y) < radius) {
+          velocity.y = -velocity.y
+        } else {
+          this.applyForce(body, gravity)
+          this.updateBodies(body)
+        }
+
+        position.y += velocity.y
+
+        console.log(position.y, velocity.y, acceleration.y)
+      }
+    }
+  }
+
+  updateBodies (body) {
+    const { position, velocity, acceleration } = body.vector; 
+
+    body.update(velocity, acceleration)
+    body.update(position, velocity)
+  }
+
+  applyForce (body, force) {
+    const { acceleration } = body.vector;
+
+    body.update(acceleration, force)
   }
 }
 
 Moment.Physics = class {
   create () {
     var defaults = {
-      gravity: new Vector(0, 0.05)
+      label: 'physics',
+      gravity: new Vector(0, 0.1)
     }
 
     return defaults;
@@ -61,8 +113,7 @@ Moment.Render = class {
     const { 
       canvas, 
       ctx, 
-      physics: { gravity },
-      engine: { world: { bodies } },
+      engine: { world: { bodies, physics: { gravity } } },
       options: { width, height, background } 
     } = render;
 
@@ -76,9 +127,7 @@ Moment.Render = class {
         shape, 
         fillStyle, 
         radius, 
-        velocity,
-        position, 
-        position: { x, y } 
+        vector: { velocity, position, position: { x, y} },
       } = body;
 
       ctx.beginPath()
@@ -87,19 +136,17 @@ Moment.Render = class {
         case 'circle':
           ctx.arc(x, y, radius, 0, Math.PI * 2, false)
           ctx.fillStyle = fillStyle;
-          ctx.fill()
-          position.add(velocity)
-          velocity.add(gravity)
           break;
         case 'rect':
           ctx.rect(x, y, body.width, body.height)
           ctx.fillStyle = fillStyle;
-          ctx.fill()
           break;
         default:
           break;
       }
 
+      ctx.stroke()
+      ctx.fill()
       ctx.closePath()
       
     }
@@ -134,18 +181,50 @@ Moment.Sandbox = class {
 }
 
 Moment.RigidBody = class {
+  constructor () {
+
+  }
+
+  create (x, y) {
+    const defaults = {
+      shape: null,
+      fillStyle: 'red',
+      area: null,
+      isStatic: false,
+      vector: {
+        position: new Vector(x, y),
+        velocity: new Vector(0, 0),
+        acceleration: new Vector(0, 0),
+      },
+      update: this.update,
+    }
+
+    return defaults;
+  }
+
+  update (vector, force) {
+    vector.add(force)
+  }
+
+  applyForce () {
+    acceleration.add(force)
+  }
+}
+
+Moment.RigidBodies = class extends Moment.RigidBody {
+  constructor () {
+    super();
+  }
+
   circle (x, y, radius, options) {
     const defaults = {
       shape: 'circle',
-      fillStyle: 'red',
-      area: Math.round(Math.PI * radius ** 2),
       radius: radius,
-      position: new Vector(x, y),
-      velocity: new Vector(0, 0),
-      acceleration: new Vector(0, 0),
+      area: Math.round(Math.PI * radius ** 2),
     }
 
     const extend = {
+      ...this.create(x, y),
       ...defaults,
       ...options,
     }
@@ -156,26 +235,18 @@ Moment.RigidBody = class {
   rect (x, y, width, height, options) {
     const defaults = {
       shape: 'rect',
-      fillStyle: 'red',
       area: width * height,
-      isStatic: false,
       width,
       height,
-      position: new Vector(x, y),
-      velocity: new Vector(0, 0),
-      acceleration: new Vector(0, 0),
     }
 
     const extend = {
+      ...this.create(x, y),
       ...defaults,
       ...options,
     }
 
     return extend
-  }
-
-  applyForce (force) {
-
   }
 }
 
@@ -184,6 +255,7 @@ Moment.Looper = class {
     const { 
       canvas, 
       ctx, 
+      physics,
       engine: { world: { bodies } },
       options: { width, height, background } 
     } = render;
@@ -195,6 +267,7 @@ Moment.Looper = class {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         draw(render)
+        engine.update(engine, render)
       }, 10)
 
     }
